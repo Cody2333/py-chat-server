@@ -7,7 +7,7 @@ import UserDict
 #global variables
 RECV_BUFFER = 1024 
 PORT = 3316
-HOST="0.0.0.0"
+HOST=""
 NAME="CodyChatServer"
 
 def dataHandler(data):
@@ -94,7 +94,7 @@ class ChatServer():
                 send('[%s]-1' %funcId,sock)
                 
     def doGetMemberList(self,cmdList,sock,funcId):
-        time.sleep(0.5)
+        #time.sleep(0.5)
         msg='[%s]' %funcId
         for name in self.userDict.keys():
             msg=msg+name+'&'
@@ -132,7 +132,7 @@ class ChatServer():
                             funcId,message=dataHandler(data)
                             if funcId!='0':
                                 cmdList=messageHandler(message)
-                                time.sleep(0.5)
+                                #time.sleep(0.5)
                                 try:
                                     self.cmdDict.get(cmdList[0])(cmdList,sock,funcId)
                                 except:

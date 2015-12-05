@@ -12,7 +12,23 @@ lCallback = {}
 iFuncId = 1 
 RECV_BUFFER = 1024 
 PORT = 3316
-HOST='localhost'
+HOST='www.cody.wang'
+
+def dataHandler(data):
+    print 'data = %s' % data
+    i = data.find('[')
+    j = data.find(']')
+    if i!=-1 and j!=-1:
+        sFuncId = data[i+1:j].strip()
+        message = data[j+1:].strip()
+    else:
+        sFuncId='0'
+        message='error'
+    return sFuncId,message
+
+def messageHandler(message):
+    list=message.split('&')
+    return list
 
 class ChatWindow(QWidget):
     #fromUser:本机名字
@@ -29,7 +45,7 @@ class ChatWindow(QWidget):
         self.btnSend = QPushButton('send')
         self.input = QLineEdit()
         self.name = QLineEdit('Default')
-        self.chat = QTextEdit()
+        self.chatText = QTextEdit()
         self.timer = QTimer()
         self.messages = []
         self.build()
@@ -63,14 +79,14 @@ class ChatWindow(QWidget):
     #刷新信息显示
     def showChat(self):
         if self.toUser in chatDict.keys():
-            self.chat.setText(chatDict[self.toUser])
+            self.chatText.setText(chatDict[self.toUser])
 
     def exit(self):
         s.close()
         sys.exit()
  
     def build(self):
-        self.layout.addWidget(self.chat, 0, 0, 5, 4)
+        self.layout.addWidget(self.chatText, 0, 0, 5, 4)
         self.layout.addWidget(self.input, 5, 0, 1, 4)
         self.layout.addWidget(self.btnSend, 5, 4)
  
@@ -108,21 +124,25 @@ class ListWindow(QMainWindow):
         self.timer=QTimer()
         self.lists=QListWidget()
         self.Send(self.onGetMemberList,'getmember')
-        self.ok = QPushButton("OK")
+        self.quit = QPushButton("Quit")
         self.refresh=QPushButton("refresh")
+        self.cwlist=[]
         vLayout = QVBoxLayout()
         vLayout.addWidget(self.lists)
-        vLayout.addWidget(self.ok)
+        vLayout.addWidget(self.quit)
         vLayout.addWidget(self.refresh)
         widget = QWidget()
         widget.setLayout(vLayout)
         self.setCentralWidget(widget)
  
     def createAction(self):
-        self.ok.clicked.connect(self.openChatWindow)
+        self.quit.clicked.connect(self.exit)
         self.refresh.clicked.connect(self.update)
         self.lists.itemDoubleClicked.connect(self.onItemDoubleClicked)
     
+    def exit(self):
+        s.close()
+        sys.exit()
 
     #双击 user name 与该 user 进行交谈，打开chat window
     def onItemDoubleClicked(self,item):
@@ -130,13 +150,14 @@ class ListWindow(QMainWindow):
         item.setTextColor(QColor(0,0,0))  
         toUser=str(item.text())
         if toUser not in chatDict.keys():
-            chatDict[toUser]='talk between %s and %s' %(accountName,toUser)
+            chatDict[toUser]='talk between %s and %s\r\n' %(accountName,toUser)
         self.openChatWindow(accountName,toUser)
         
     def openChatWindow(self,fromUser,toUser):
         print 'OK'
-        self.chat = ChatWindow(fromUser,toUser)
-        self.chat.show()
+        self.cw=ChatWindow(fromUser,toUser)
+        self.cwlist.append(self.cw)
+        self.cw.show()
     
     #更新在线成员列表
     def update(self,message):          
@@ -182,7 +203,7 @@ class ListWindow(QMainWindow):
             except Exception,e:
                 print e
                 break        
-            
+
     def Send(self,callback,message):
         global iFuncId
         global lCallback
@@ -201,39 +222,25 @@ class ListWindow(QMainWindow):
 
         
     
-def dataHandler(data):
-    print 'data = %s' % data
-    i = data.find('[')
-    j = data.find(']')
-    if i!=-1 and j!=-1:
-        sFuncId = data[i+1:j].strip()
-        message = data[j+1:].strip()
-    else:
-        sFuncId='0'
-        message='error'
-    return sFuncId,message
-
-def messageHandler(message):
-    list=message.split('&')
-    return list
 
 #登陆界面主类
 class LoginGui(QDialog):  
     def __init__(self):  
         QDialog.__init__(self)
-        self.lableName=QLabel(self)
-        self.textName = QLineEdit(self)  
+        self.setWindowTitle('login')
+        self.lableName=QLabel("please enter a nick name :")
+        self.username = QLineEdit(self)  
         self.buttonLogin = QPushButton('Login', self)  
         self.buttonLogin.clicked.connect(self.handleLogin)  
         layout = QVBoxLayout(self)  
         layout.addWidget(self.lableName)  
-        layout.addWidget(self.textName)  
+        layout.addWidget(self.username)  
         layout.addWidget(self.buttonLogin)  
     
     
     def handleLogin(self):  
         global accountName
-        username=self.textName.text()
+        username=self.username.text()
         username=str(username).strip()
         if username=='':
             QMessageBox.warning(  

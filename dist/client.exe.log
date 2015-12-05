@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "client.py", line 274, in <module>
+  File "socket.pyo", line 224, in meth
+socket.error: [Errno 10061] 
+Traceback (most recent call last):
+  File "client.py", line 274, in <module>
+  File "socket.pyo", line 224, in meth
+socket.error: [Errno 10061] 
