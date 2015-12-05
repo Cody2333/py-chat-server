@@ -49,12 +49,12 @@ def Send(callback,message,listenerSock):
     print 'send message to ChatServer : %s'%message
     
     
-class Login(gui.QDialog):  
+class LoginGui(gui.QDialog):  
     def __init__(self):  
         gui.QDialog.__init__(self)
         self.lableName=gui.QLabel(self)
         self.textName = gui.QLineEdit(self)  
-        self.buttonLogin = gui.QPushButton('Login', self)  
+        self.buttonLogin = gui.QPushButton('LoginGui', self)  
         self.buttonLogin.clicked.connect(self.handleLogin)  
         layout = gui.QVBoxLayout(self)  
         layout.addWidget(self.lableName)  
@@ -151,7 +151,7 @@ s.connect((host, port))
 
 print s
 app = gui.QApplication(sys.argv)
-if Login().exec_()==gui.QDialog.Accepted:
+if LoginGui().exec_()==gui.QDialog.Accepted:
     c = Client()
     c.show()
     app.exec_()

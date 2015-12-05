@@ -46,8 +46,8 @@ def recvListener(socket):
         
 
 
-def loginIn(message):
-    if message == '1':
+def loginIn(*l):
+    if l[0] == '1':
         print 'login success !!!!!!!!!!'
     else:
         print 'login failed !Please choose another name!'

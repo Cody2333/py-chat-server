@@ -1,4 +1,5 @@
 eclipse.preferences.version=1
+encoding/chatWindow.py=utf-8
+encoding/client.py=utf-8
 encoding/pyqt1.py=utf-8
 encoding/pyqt2.py=utf-8
-encoding/pyqttest.py=utf-8

@@ -38,13 +38,15 @@ class ChatMember():
 
 class ChatServer():
     def __init__(self,port,name):
-        self.cmdDict={}
-        self.cmdDict['login']=self.doLogin
+        self.cmdDict={'login':self.doLogin,
+                      'getmember':self.doGetMemberList,
+                      'talkto':self.doTalkto}
         self.CONNECTION_LIST=[]
         self.port=port
         self.host=''
         self.name=name
         self.userDict={}
+        self.userDict['admin']=None
         self.server_socket = socket(AF_INET, SOCK_STREAM)
         self.server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.server_socket.bind((self.host,self.port))
@@ -53,8 +55,18 @@ class ChatServer():
         self.CONNECTION_LIST.append(self.server_socket)
         print "Chat server %s started on port %d" %(self.name,self.port) 
         
+    def broadcast(self,sock,message):
+        for socket in self.CONNECTION_LIST:
+            if socket != self.server_socket and socket != sock :
+                try :
+                    socket.send(message)
+                except :
+                    socket.close()
+                    self.CONNECTION_LIST.remove(socket)
+        
     def createNewMember(self,name,sock):
         self.userDict[name]=sock
+        self.broadcast(sock, '[-101]lalala')
 
     def doLogin(self,cmdList,sock,funcId):
         if cmdList[1] not in self.userDict.keys():
@@ -67,6 +79,7 @@ class ChatServer():
     def doTalkto(self,cmdList,sock,funcId):
         name=cmdList[1]
         content=cmdList[2]
+        print '@@@'+name
         for key,value in self.userDict.items():
             if value==sock:
                 sourceName=key
@@ -75,12 +88,13 @@ class ChatServer():
         else:
             targetSock=self.userDict[name]
             try:
-                send('[-1]sourceName&content',targetSock)
+                send('[-102]%s&%s' %(sourceName,content),targetSock)
                 send('[%s]1' %funcId,sock)
             except:
                 send('[%s]-1' %funcId,sock)
                 
     def doGetMemberList(self,cmdList,sock,funcId):
+        time.sleep(0.5)
         msg='[%s]' %funcId
         for name in self.userDict.keys():
             msg=msg+name+'&'
@@ -95,6 +109,8 @@ class ChatServer():
             if value==sock:
                 del self.userDict[key]
                 print key,'deleted'
+        self.broadcast(sock, '[-101]lalala')
+
 
     def loop(self):
         while 1:
@@ -103,7 +119,7 @@ class ChatServer():
             for sock in self.read_sockets:
                 if sock == self.server_socket:
                     sockfd, addr = self.server_socket.accept()
-                    send("welcome to %s" %self.name, sockfd)
+                    # send("welcome to %s" %self.name, sockfd)
                     self.CONNECTION_LIST.append(sockfd)
                     print "Client (%s, %s) connected" % addr
                                 
@@ -111,17 +127,18 @@ class ChatServer():
                     try:
                         data = sock.recv(RECV_BUFFER)
                         if not data:
-                            break
-                        funcId,message=dataHandler(data)
-                        if funcId!='0':
-                            cmdList=messageHandler(message)
-                            time.sleep(0.5)
-                            try:
-                                self.cmdDict.get(cmdList[0])(cmdList,sock,funcId)
-                            except:
-                                print 'command not match'    
+                            pass
                         else:
-                            print 'cmd error'         
+                            funcId,message=dataHandler(data)
+                            if funcId!='0':
+                                cmdList=messageHandler(message)
+                                time.sleep(0.5)
+                                try:
+                                    self.cmdDict.get(cmdList[0])(cmdList,sock,funcId)
+                                except:
+                                    print 'command not match'    
+                            else:
+                                print 'cmd error'         
                      
                     except:
                         self.logout(sock, addr)
