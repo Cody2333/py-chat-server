@@ -9,6 +9,7 @@ RECV_BUFFER = 1024
 PORT = 3316
 HOST=""
 NAME="CodyChatServer"
+INTERVAL=0.1
 
 def dataHandler(data):
     print 'data = %s' % data
@@ -40,7 +41,9 @@ class ChatServer():
     def __init__(self,port,name):
         self.cmdDict={'login':self.doLogin,
                       'getmember':self.doGetMemberList,
-                      'talkto':self.doTalkto}
+                      'talkto':self.doTalkto,
+                      'filename':self.doGetFileName,
+                      'ready':self.doSendFile}
         self.CONNECTION_LIST=[]
         self.port=port
         self.host=''
@@ -76,6 +79,8 @@ class ChatServer():
         else:
             send('[%s]0' %funcId,sock)
             
+    def getSockByName(self,name):
+        return self.userDict[name]
     def doTalkto(self,cmdList,sock,funcId):
         name=cmdList[1]
         content=cmdList[2]
@@ -86,7 +91,7 @@ class ChatServer():
         if name not in self.userDict.keys():
             send('[%s]0' %funcId,sock)
         else:
-            targetSock=self.userDict[name]
+            targetSock=self.getSockByName(name)
             try:
                 send('[-102]%s&%s' %(sourceName,content),targetSock)
                 send('[%s]1' %funcId,sock)
@@ -101,6 +106,70 @@ class ChatServer():
         msg=msg.strip('&')
         send(msg, sock)
 
+    def doGetFileName(self,cmdList,sock,funcId):
+        name=cmdList[1]
+        print 'get file name %s' %cmdList[2]
+        self.fileName=cmdList[2].strip()
+        if self.fileName:
+            #接收文件名成功
+            message='[%s]1' %funcId
+            send(message,sock)
+            
+            #接收文件成功之后，进行文件接收
+            self.recvFile(self.fileName,sock)
+            self.sendFile(name,self.fileName,sock)
+        else:
+            #接收文件名失败
+            message='[%s]0' %funcId
+            send(message, sock)
+            
+    def doSendFile(self,cmdList,sock,funcId):
+        #send file
+        print "server sending file to client   ~~~"
+        filename=cmdList[1]
+        msg='[%s]1' %funcId
+        send(msg,sock)
+        time.sleep(INTERVAL)
+        try:
+            f = open('server/'+filename, 'rb') 
+            while True: 
+                data = f.read(RECV_BUFFER) 
+                if not data: 
+                    break
+                sock.sendall(data) 
+            f.close() 
+            time.sleep(INTERVAL)
+    
+            sock.sendall('EOF')
+            print "send file success!"
+        except:
+            print "senf file failed!!"
+            
+    def sendFile(self,name,filename,sock):
+        #先传输文件名,客户端响应，回调doSendFile函数
+        targetSock=self.getSockByName(name)
+        for key,value in self.userDict.items():
+            if value==sock:
+                sourceName=key        
+        msg='[-104]%s&%s'%(filename,sourceName)
+        send(msg,targetSock)
+              
+    def recvFile(self,filename,sock):
+        #TODO
+        #现在处理文件传输的方式是非异步的，服务器一次只能处理一个文件传输？
+        print "starting revc file!"
+        try:
+            f = open('server/'+filename, 'wb') 
+            while True:
+                data = sock.recv(RECV_BUFFER) 
+                if data == 'EOF': 
+                    print "recv file success!"
+                    break
+                f.write(data) 
+            f.close()
+        except:
+            print 'recv file failed'         
+    
     def logout(self,sock,addr):
         print "Client (%s, %s) is offline" % addr
         sock.close()
