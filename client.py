@@ -17,6 +17,8 @@ HOST='localhost'
 INTERVAL=0.1
 DIR_PREFIX='client/'
 
+#两个工具函数，用于处理接收到的数据指令
+
 def dataHandler(data):
     print 'data = %s' % data
     i = data.find('[')
@@ -27,22 +29,31 @@ def dataHandler(data):
     else:
         sFuncId='0'
         message='error'
+        
     return sFuncId,message
 
 def messageHandler(message):
     list=message.split('&')
     return list
 
+#会话聊天主界面
 class ChatWindow(QWidget):
     #fromUser:本机名字
     #toUser  :通信方名字
     def __init__(self,fromUser,toUser):
         super(ChatWindow, self).__init__()
+        #init data
         self.fromUser=fromUser
         self.toUser=toUser
         self.listwindow=lw
-        self.oldChatDict={}
-        self.title='conversation between %s and %s' %(self.fromUser,self.toUser)
+        self.title='talking to %s .' %self.toUser
+        chatDict.setdefault(toUser,'')
+        #init gui
+        self.initView(toUser)
+        self.initLayout()
+        self.createAction()
+
+    def initView(self,toUser=''):
         self.setWindowTitle(self.title)
         self.layout = QGridLayout(self)
         self.btnSend = QPushButton('send')
@@ -50,13 +61,28 @@ class ChatWindow(QWidget):
         self.input = QLineEdit()
         self.name = QLineEdit('Default')
         self.chatText = QTextEdit()
+        self.chatText.setReadOnly(True)
+        self.chatText.setText(chatDict[toUser])
         self.timer = QTimer()
-        self.messages = []
-        self.build()
-        self.createAction()
+                        
+    def initLayout(self):
+        self.layout.addWidget(self.chatText, 0, 0, 5, 4)
+        self.layout.addWidget(self.input, 5, 0, 1, 4)
+        self.layout.addWidget(self.btnSend, 6, 0)
+        self.layout.addWidget(self.file, 5,4)
 
+    def createAction(self):
+        self.btnSend.clicked.connect(self.sendMsg)
+        self.file.clicked.connect(self.getFileName)
+        
+        
+    #响应window关闭事件
+    def closeEvent(self, event):
+        self.listwindow.cwDict.pop(self.toUser)
+        event.accept()
+        
+    #响应客户端gui的文件选择操作，发送给服务器文件名
     def getFileName(self):
-        #响应客户端gui的文件选择操作，发送给服务器文件名
         self.fileDir=QFileDialog.getOpenFileName(self,"Open file dialog","/","All files (*)")
         print self.fileDir
         self.fileName=self.fileDir.split('/')[-1]
@@ -64,23 +90,61 @@ class ChatWindow(QWidget):
         #self.input.setText(self.fileDir)
         try:
             data='filename&%s&%s' %(self.toUser,self.fileName)
-            #回调函数为onGetFileName
-            self.listwindow.Send(self.onGetFileName,data)
-            chatDict.setdefault(self.toUser,"")
-            chatDict[self.toUser]+=self.fromUser+' : '+"send file:"+self.fileName+'\r\n'
+            #回调函数为onReadyForSend
+            self.listwindow.Send(self.onReadyForSend,data)
+            self.listwindow.appendChatDict(self.toUser, "send file:"+self.fileName)
         except:
             QMessageBox.warning(  
                     self, 'Error', 'send file failed---')   
     
+        
+ 
+    def onReadyForSend(self,message):
+        if message=='1':
+            time.sleep(INTERVAL)
+            #服务器已经收到文件信息，打开相应文件发送到服务器
+            print 'send filename success'
+            self.sendFile()         
+        else:
+            print 'send filename failed'
+
+            self.listwindow.appendChatDict(self.toUser, 'send file failed')
+            QMessageBox.warning(  
+                    self, 'Error', 'send file failed')
+
+    #点击发送信息执行的函数
+    def sendMsg(self):
+        text = str(self.input.text())
+        self.input.setText('')
+        if text.strip() == '':
+            return
+        try:
+            data='talkto&%s&%s' %(self.toUser,text)
+            print data
+            self.listwindow.Send(self.onSendMsg, data)
+            self.listwindow.appendChatDict(self.toUser, text,self.fromUser)
+        except:
+            QMessageBox.warning(  
+                    self, 'Error', 'send message failed--- ')   
+
+    #发送信息的回调函数
+    def onSendMsg(self,message):
+        if message=='1':
+            print 'send message success--'
+        else:
+            print 'send message failed --'
+            QMessageBox.warning(  
+                    self, 'Error', 'send message failed -')
+
+ 
     def sendFile(self):
         #send file
         print "server ready, now client sending file~~"
-        chatDict.setdefault(self.toUser,"")
-        chatDict[self.toUser]+=self.fromUser+' : '+'sending file~~'+'\r\n'
+        self.listwindow.appendChatDict(self.toUser, 'sending file ~~')
         try:
             f = open(self.fileDir, 'rb') 
             time.sleep(INTERVAL)
-            while True: 
+            while True:  
                 data = f.read(RECV_BUFFER) 
                 if not data: 
                     break
@@ -89,98 +153,30 @@ class ChatWindow(QWidget):
             time.sleep(INTERVAL)
             s.sendall('EOF') 
             print "send file success!"  
-            chatDict[self.toUser]+=self.fromUser+' : '+"send file success"+'\r\n'
+            self.listwindow.appendChatDict(self.toUser, 'send file success ~~')
         except:
+            self.listwindow.appendChatDict(self.toUser, 'send file failed !!')            
             print 'sending file failed!!!'
-        
- 
-    def onGetFileName(self,message):
-        if message=='1':
-            time.sleep(INTERVAL)
-            #服务器已经收到文件信息，打开相应文件发送到服务器
-            print 'send filename success'
-            self.sendFile()         
-        else:
-            print 'send filename failed'
-            chatDict.setdefault(self.toUser,"")
-            chatDict[self.toUser]+=self.fromUser+' : '+'send file failed'+'\r\n'
-            QMessageBox.warning(  
-                    self, 'Error', 'send file failed')
-
-    #点击发送信息执行的函数
-    def handleTalkto(self):
-        text = str(self.input.text())
-        self.input.setText('')
-        if text.strip() == '':
-            return
-        try:
-            data='talkto&%s&%s' %(self.toUser,text)
-            print data
-            self.listwindow.Send(self.onTalkto, data)
-            chatDict.setdefault(self.toUser,"")
-            chatDict[self.toUser]+=self.fromUser+' : '+text+'\r\n'
-        except:
-            QMessageBox.warning(  
-                    self, 'Error', 'send message failed---')   
-
-    #发送信息的回调函数
-    def onTalkto(self,message):
-        if message=='1':
-            print 'send message success'
-        else:
-            print 'send message failed'
-            QMessageBox.warning(  
-                    self, 'Error', 'send message failed')
-
-    #刷新信息显示
-    def showChat(self):
-        
-        if self.toUser in chatDict.keys():
-            self.oldChatDict.setdefault(self.toUser,"")
-            if self.oldChatDict[self.toUser]!=chatDict[self.toUser]:
-                self.oldChatDict[self.toUser]=chatDict[self.toUser]
-                self.chatText.setText(chatDict[self.toUser])
-                self.chatText.setFocus()
-            else:
-                pass
-
-    def exit(self):
-        s.close()
-        sys.exit()
- 
-    def build(self):
-        self.layout.addWidget(self.chatText, 0, 0, 5, 4)
-        self.layout.addWidget(self.input, 5, 0, 1, 4)
-        self.layout.addWidget(self.btnSend, 6, 0)
-        self.layout.addWidget(self.file, 5,4)
-
- 
-        self.layout.setSizeConstraint(QLayout.SetFixedSize)
- 
-    def createAction(self):
-        self.btnSend.clicked.connect(self.handleTalkto)
-        self.file.clicked.connect(self.getFileName)
-        
-        #定时刷新聊天界面
-        self.timer.timeout.connect(self.showChat)
-        self.timer.start(300)
-        
-        
+                
 class ListWindow(QMainWindow):
     global accountName
     def __init__(self):
         super(ListWindow, self).__init__()
-        #初始化界面
-        self.initView()
-        
+        #init data
+        #flag 用于控制recvListener线程的启动与暂停，现在接收线程是阻塞的，接收文件时无法接收其他信息。
         self.flag= 1
+        self.cwDict={}
+        
+        #init view and layout
+        self.initView()
+        self.initLayout()
         
         #初始化信号和槽的关系
         self.createAction() 
         
         #响应服务器的请求function的字典format---->key<int>:value<function>
-        self.resActionDict={-101:self.update,
-                            -102:self.updateChatDict,
+        self.resActionDict={-101:self.updateList,
+                            -102:self.getMessage,
                             -104:self.readyForRecvFile}
         
         #开启接收数据的监听线程
@@ -188,15 +184,16 @@ class ListWindow(QMainWindow):
         recvThread.setDaemon(True)
         recvThread.start()
     
+        
     def initView(self):
         self.setGeometry(100, 100, 250, 550)
         self.setWindowTitle(accountName)
         self.timer=QTimer()
         self.lists=QListWidget()
-        self.Send(self.onGetMemberList,'getmember')
         self.quit = QPushButton("Quit")
         self.refresh=QPushButton("refresh")
-        self.cwDict={}
+
+    def initLayout(self):
         vLayout = QVBoxLayout()
         vLayout.addWidget(self.lists)
         vLayout.addWidget(self.quit)
@@ -204,14 +201,23 @@ class ListWindow(QMainWindow):
         widget = QWidget()
         widget.setLayout(vLayout)
         self.setCentralWidget(widget)
- 
+        
     def createAction(self):
+        self.updateList()
         self.quit.clicked.connect(self.exit)
-        self.refresh.clicked.connect(self.update)
+        self.refresh.clicked.connect(self.updateList)
         self.lists.itemDoubleClicked.connect(self.onItemDoubleClicked)
     
-    def exit(self):
+    def closeEvent(self, event):
+        self.cwDict={}
         s.close()
+        event.accept()
+        print 'close'
+
+    def exit(self):
+        self.cwDict={}
+        s.close()
+        print 'exit'
         sys.exit()
 
     #双击 user name 与该 user 进行交谈，打开chat window
@@ -219,24 +225,15 @@ class ListWindow(QMainWindow):
         global accountName
         item.setTextColor(QColor(0,0,0))  
         toUser=str(item.text())
-        if toUser not in chatDict.keys():
-            chatDict[toUser]='talk between %s and %s\r\n' %(accountName,toUser)
         self.openChatWindow(accountName,toUser)
         
-    def openChatWindow(self,fromUser,toUser):
-        print 'OK'
-        self.cw=ChatWindow(fromUser,toUser)
-        self.cwDict[toUser]=self.cw
-        self.cw.show()
-        print 'len',len(self.cwDict)
-        
-    def emptyCallBack(self,message):
+    def recvFile(self,message):
         self.flag=0
         print "starting revc file!!!"
         print self.recvsourceName
         print self.recvfilename
-        chatDict.setdefault(self.recvsourceName,"")
-        chatDict[self.recvsourceName]+='recving file~~'+'\r\n'
+
+        self.appendChatDict(self.recvsourceName, 'send a file to you, receiving~~',self.recvsourceName)
         f = open(DIR_PREFIX+accountName+'/'+self.recvfilename, 'wb') 
         while True: 
             data = s.recv(RECV_BUFFER) 
@@ -246,48 +243,97 @@ class ListWindow(QMainWindow):
                 break
             f.write(data) 
         f.close() 
-        chatDict[self.recvsourceName]+="recv file '%s' successfully\r\n" %self.recvfilename 
-    
+        self.appendChatDict(self.recvsourceName, "recv file '%s' successfully" %self.recvfilename )
 
+    '''用于改变chatDict的工具函数
+        args:name     --->   chatDict的key
+             content  --->   显示的内容
+             showName --->   显示的发送者[可选]
+    '''
+    def appendChatDict(self,name,content,showName='>>>>>'):
+        if showName:
+            chatDict.setdefault(name,"")
+            chatDict[name]+=showName+' : '+content+'\r\n'
+            isUnread=self.setUnread(name)
+                        
+        #如果会话窗口存在，刷新会话窗口
+        if not isUnread:
+            self.cwDict[name].chatText.append(showName+":"+content)
+            
     def readyForRecvFile(self,message):
         l=messageHandler(message)
         self.recvfilename=l[0]
         self.recvsourceName=l[1]
-        self.Send(self.emptyCallBack, 'ready&%s' %self.recvfilename)
+        self.Send(self.recvFile, 'ready&%s' %self.recvfilename)
 
         
     #更新在线成员列表
-    def update(self,message):          
+    def updateList(self,message=''):          
         global accountName
         self.Send(self.onGetMemberList,'getmember&%s' %accountName)
     
-    #更新聊天记录字典
-    def updateChatDict(self,message):
-        l=messageHandler(message)
-        print l
-        fromUser=l[0]
-        content=l[0]+' : '+l[1]+'\r\n'
-        chatDict.setdefault(fromUser,"")
-        chatDict[fromUser]+=content
-        print 'chat content now--->\r\n'+chatDict[fromUser]
-        
+    #如果不存在和user的会话窗口那么将user设置为未读。
+    def setUnread(self,user):
         #改变listWidget的对应item的外观
         c=self.lists.count()
         i=0
         for i in range(0,c):
             x=self.lists.item(i)
-            if str(x.text())==fromUser:
+            if str(x.text())==user:
                 #todo here
                 x_str=str(x.text())
                 if x_str not in self.cwDict.keys():
                     x.setTextColor(QColor(255,0,0))
-                else:
-                    if self.cwDict[x_str].isActiveWindow():
-                        pass
-                    else:
-                        x.setTextColor(QColor(255,0,0))
-    
+                    return True
+        return False
+                    
+    #更新聊天记录字典
+    def getMessage(self,message):
+        l=messageHandler(message)
+        print l
+        fromUser=l[0]
+        content=l[1]
 
+        self.appendChatDict(fromUser, content, fromUser)
+        #print 'chat content now--->\r\n'+chatDict[fromUser]
+        #改变listWidget的对应item的外观
+        self.setUnread(fromUser)
+
+                
+
+    def Send(self,callback,message):
+        global iFuncId
+        global lCallback
+        lCallback[iFuncId] = callback
+        time.sleep(INTERVAL)
+        s.send("[%d] %s" % (iFuncId,message))
+        iFuncId += 1
+        print 'send message to ChatServer : %s'%message
+    
+    def onGetMemberList(self,message):
+        self.userlist=messageHandler(message)
+        self.lists.clear()
+        for item in self.userlist:
+            if item!=accountName:
+                self.lists.addItem(item)
+    
+    def openChatWindow(self,fromUser,toUser):
+        print 'open chat window'
+        if toUser not in self.cwDict.keys():
+            self.cw=ChatWindow(fromUser,toUser)
+            self.cwDict[toUser]=self.cw
+            self.cw.show()    
+        
+    def Send(self,callback,message):
+        global iFuncId
+        global lCallback
+        lCallback[iFuncId] = callback
+        time.sleep(INTERVAL)
+        s.send("[%d] %s" % (iFuncId,message))
+        iFuncId += 1
+        print 'send message to ChatServer : %s'%message
+            
+    #接收服务器数据的线程
     def recvListener(self,socket):
         while 1:
             try:
@@ -315,25 +361,6 @@ class ListWindow(QMainWindow):
             except Exception,e:
                 print e
                 break        
-
-    def Send(self,callback,message):
-        global iFuncId
-        global lCallback
-        lCallback[iFuncId] = callback
-        time.sleep(INTERVAL)
-        s.send("[%d] %s" % (iFuncId,message))
-        iFuncId += 1
-        print 'send message to ChatServer : %s'%message
-    
-    def onGetMemberList(self,message):
-        self.userlist=messageHandler(message)
-        self.lists.clear()
-        for item in self.userlist:
-            if item!=accountName:
-                self.lists.addItem(item)
-
-        
-    
 
 #登陆界面主类
 class LoginGui(QDialog):  
