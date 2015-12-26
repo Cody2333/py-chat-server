@@ -13,7 +13,7 @@ lCallback = {}
 iFuncId = 1 
 RECV_BUFFER = 1024 
 PORT = 3316
-HOST='localhost'
+HOST='www.cody.wang'
 INTERVAL=0.1
 DIR_PREFIX='client/'
 
@@ -393,7 +393,7 @@ class LoginGui(QDialog):
         if message=='1' :
             accountName=username
             if not os.path.exists(DIR_PREFIX+accountName):
-                os.mkdir(DIR_PREFIX+accountName)
+                os.makedirs(DIR_PREFIX+accountName)
             self.accept()
         else:  
             QMessageBox.warning(  
