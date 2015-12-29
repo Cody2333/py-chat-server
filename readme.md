@@ -2,9 +2,11 @@
 ###客户端send函数
 |function|send format          |return         |remark        |
 |--------|---------------------|---------------|--------------|
-|login   |login&name           |1:success;0:failed|处理登录|
-|getmember|getmember|[list]|获取服务器在线成员名字列表|
-|talkto|talkto&name&message|1:success;0:target user offline;-1:other error|一对一聊天|
+|login   |login&user_name           |1:success;0:failed|处理登录|
+|getmember|getmember                 |[list]       |获取服务器在线成员名字列表        |
+|talkto   |talkto&to_user&message    |1:success;0:target user offline;-1:other error|一对一聊天|
+|filename|filename&to_user&file_name |1:success;0:target user offline;-1:other error|传输文件名和文件传输对象|
+|ready   |ready&file_name            |none|准备好接受服务器穿过来对应文件名的文件
 
 
 ###回调函数id------>sFuncId
